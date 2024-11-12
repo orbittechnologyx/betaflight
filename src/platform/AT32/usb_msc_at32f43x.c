@@ -44,7 +44,9 @@
 #include "drivers/usb_msc.h"
 
 #include "msc/usbd_storage.h"
+#if defined(USE_FLASHFS)
 #include "msc/usbd_storage_emfat.h"
+#endif
 
 #include "pg/sdcard.h"
 #include "pg/usb.h"
@@ -184,6 +186,19 @@ uint8_t mscStart(void)
     msc_usb_clock48m_select(USB_CLK_HEXT);
     nvic_irq_enable(OTG_IRQ, NVIC_PRIORITY_BASE(NVIC_PRIO_USB), NVIC_PRIORITY_SUB(NVIC_PRIO_USB));
 
+#ifdef USE_SDCARD
+#ifdef USE_SDCARD_SDIO
+    USBD_STORAGE_fops = &USBD_MSC_MICRO_SDIO_fops;
+#endif
+#ifdef USE_SDCARD_SPI
+    USBD_STORAGE_fops = &USBD_MSC_MICRO_SD_SPI_fops;
+#endif
+#endif
+
+#ifdef USE_FLASHFS
+    USBD_STORAGE_fops = &USBD_MSC_EMFAT_fops;
+#endif
+
     usbd_init(&otg_core_struct,
             USB_FULL_SPEED_CORE_ID,
             USB_ID,
@@ -199,7 +214,7 @@ uint8_t mscStart(void)
 
 int8_t msc_disk_capacity(uint8_t lun, uint32_t *block_num, uint32_t *block_size)
 {
-    return USBD_MSC_EMFAT_fops.GetCapacity(lun, block_num, block_size);
+    return USBD_STORAGE_fops->GetCapacity(lun, block_num, block_size);
 }
 
 int8_t msc_disk_read(
@@ -208,7 +223,7 @@ int8_t msc_disk_read(
     uint8_t *buf,       // Pointer to the buffer to save data
     uint16_t blk_len)   // number of blocks to be read
 {
-    return USBD_MSC_EMFAT_fops.Read(lun, buf, blk_addr, blk_len);
+    return USBD_STORAGE_fops->Read(lun, buf, blk_addr, blk_len);
 }
 
 int8_t msc_disk_write(uint8_t lun,
@@ -228,7 +243,7 @@ uint8_t *get_inquiry(uint8_t lun)
 {
     UNUSED(lun);
 
-    return (uint8_t *)USBD_MSC_EMFAT_fops.pInquiry;
+    return (uint8_t *)USBD_STORAGE_fops->pInquiry;
 }
 
 uint8_t msc_get_readonly(uint8_t lun)
